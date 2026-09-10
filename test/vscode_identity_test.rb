@@ -6,8 +6,8 @@ require "json"
 class VsCodeIdentityTest < WorktreesTestCase
   def test_style_command_preserves_repo_color_and_existing_worktree_settings
     Dir.mktmpdir do |directory|
-      primary = create_repository(File.join(directory, "zenpayroll"))
-      target = File.join(directory, "zenpayroll-feature")
+      primary = create_repository(File.join(directory, "example_app"))
+      target = File.join(directory, "example_app-feature")
       primary_settings = File.join(primary, ".vscode", "settings.json")
       worktree_settings = File.join(target, ".vscode", "settings.json")
       FileUtils.mkdir_p(File.dirname(primary_settings))
@@ -27,7 +27,7 @@ class VsCodeIdentityTest < WorktreesTestCase
 
       assert status.success?, stderr
       assert_equal "", stderr
-      assert_includes stdout, "Configured VS Code identity for ZP worktree"
+      assert_includes stdout, "Configured VS Code identity for worktree"
       settings = JSON.parse(File.read(worktree_settings))
       assert_equal true, settings.fetch("editor.formatOnSave")
       assert_equal "#123456", settings.fetch("peacock.color")
@@ -54,8 +54,11 @@ class VsCodeIdentityTest < WorktreesTestCase
 
   def test_style_command_defaults_to_the_current_worktree
     Dir.mktmpdir do |directory|
-      primary = create_repository(File.join(directory, "payroll_building_blocks"))
-      target = File.join(directory, "pbb-feature")
+      primary = create_repository(File.join(directory, "sample_app"))
+      target = File.join(directory, "sample_app-feature")
+      primary_settings = File.join(primary, ".vscode", "settings.json")
+      FileUtils.mkdir_p(File.dirname(primary_settings))
+      File.write(primary_settings, JSON.generate("peacock.color" => "#654321"))
       git(primary, "worktree", "add", "-b", "feature", target)
 
       _stdout, stderr, status = Open3.capture3("ruby", SCRIPT, "style", chdir: target)
@@ -64,7 +67,7 @@ class VsCodeIdentityTest < WorktreesTestCase
       settings = JSON.parse(
         File.read(File.join(target, ".vscode", "settings.json")),
       )
-      assert_equal "#0b132b", settings.fetch("peacock.color")
+      assert_equal "#654321", settings.fetch("peacock.color")
       assert_equal(
         "${activeRepositoryBranchName}${separator}WT",
         settings.fetch("window.title"),
@@ -74,7 +77,7 @@ class VsCodeIdentityTest < WorktreesTestCase
 
   def test_style_command_is_a_no_op_in_the_primary_checkout
     Dir.mktmpdir do |directory|
-      primary = create_repository(File.join(directory, "zenpayroll"))
+      primary = create_repository(File.join(directory, "example_app"))
 
       stdout, stderr, status = Open3.capture3("ruby", SCRIPT, "style", primary)
 
@@ -84,11 +87,29 @@ class VsCodeIdentityTest < WorktreesTestCase
     end
   end
 
+  def test_style_command_is_a_no_op_without_a_primary_peacock_color
+    Dir.mktmpdir do |directory|
+      primary = create_repository(File.join(directory, "example_app"))
+      target = File.join(directory, "example_app-feature")
+      git(primary, "worktree", "add", "-b", "feature", target)
+
+      stdout, stderr, status = Open3.capture3("ruby", SCRIPT, "style", target)
+
+      assert status.success?, stderr
+      assert_equal "", stdout
+      assert_equal "", stderr
+      refute_path_exists File.join(target, ".vscode", "settings.json")
+    end
+  end
+
   def test_style_command_does_not_overwrite_malformed_worktree_settings
     Dir.mktmpdir do |directory|
-      primary = create_repository(File.join(directory, "zenpayroll"))
-      target = File.join(directory, "zenpayroll-feature")
+      primary = create_repository(File.join(directory, "example_app"))
+      target = File.join(directory, "example_app-feature")
+      primary_settings = File.join(primary, ".vscode", "settings.json")
       settings_path = File.join(target, ".vscode", "settings.json")
+      FileUtils.mkdir_p(File.dirname(primary_settings))
+      File.write(primary_settings, JSON.generate("peacock.color" => "#123456"))
       git(primary, "worktree", "add", "-b", "feature", target)
       FileUtils.mkdir_p(File.dirname(settings_path))
       malformed_settings = "{\n  this is not valid JSON\n}\n"
@@ -99,7 +120,7 @@ class VsCodeIdentityTest < WorktreesTestCase
       assert status.success?, stderr
       assert_equal "", stdout
       assert_includes stderr, "Skipping "
-      assert_includes stderr, "/zenpayroll-feature/.vscode/settings.json"
+      assert_includes stderr, "/example_app-feature/.vscode/settings.json"
       assert_equal malformed_settings, File.read(settings_path)
     end
   end

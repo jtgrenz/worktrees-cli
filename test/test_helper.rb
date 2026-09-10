@@ -52,7 +52,7 @@ class WorktreesTestCase < Minitest::Test
         porcelain = @porcelain_results.length > 1 ? @porcelain_results.shift : @porcelain_results.first
         result(porcelain)
       when ["git", "remote", "get-url", "origin"]
-        result("git@github.com:Gusto/zenpayroll.git\n")
+        result("git@github.com:example/example_app.git\n")
       when ["git", "branch", "--format=%(refname:short)", "--merged", "origin/main"]
         result("")
       else

@@ -6,12 +6,6 @@ require "tempfile"
 
 module Worktrees
   class VsCodeIdentity
-    REPOSITORIES = {
-      "zenpayroll" => { label: "ZP", color: "#2e3920" },
-      "payroll_building_blocks" => { label: "PBB", color: "#0b132b" },
-      "payroll_cms" => { label: "CMS", color: "#49335b" },
-    }.freeze
-
     TITLE_COLORS = {
       "titleBar.activeBackground" => "#b45309",
       "titleBar.activeForeground" => "#ffffff",
@@ -33,8 +27,8 @@ module Worktrees
       worktree_root = git_path("--show-toplevel", path:)
       return false unless worktree_root
 
-      repository = REPOSITORIES[File.basename(File.dirname(common_directory))]
-      return false unless repository
+      peacock_color = primary_peacock_color(common_directory:)
+      return false unless peacock_color
 
       settings_path = File.join(worktree_root, ".vscode", "settings.json")
       settings = read_worktree_settings(settings_path)
@@ -42,15 +36,12 @@ module Worktrees
 
       excluded_settings =
         Array(settings["peacock.excludedSettings"]) | TITLE_COLORS.keys
-      settings.merge!(identity_settings(repository, common_directory:))
+      settings.merge!(identity_settings(color: peacock_color))
       settings["peacock.excludedSettings"] = excluded_settings
       settings["workbench.colorCustomizations"] =
         Hash(settings["workbench.colorCustomizations"]).merge(TITLE_COLORS)
       write_settings(settings_path, settings)
-      @output.puts(
-        "Configured VS Code identity for #{repository.fetch(:label)} " \
-        "worktree: #{worktree_root}",
-      )
+      @output.puts "Configured VS Code identity for worktree: #{worktree_root}"
       true
     end
 
@@ -68,12 +59,9 @@ module Worktrees
       git_directory && common_directory && git_directory != common_directory
     end
 
-    def identity_settings(repository, common_directory:)
+    def identity_settings(color:)
       {
-        "peacock.color" => primary_peacock_color(
-          common_directory:,
-          fallback: repository.fetch(:color),
-        ),
+        "peacock.color" => color,
         "peacock.affectTitleBar" => false,
         "peacock.affectActivityBar" => true,
         "peacock.affectStatusBar" => true,
@@ -81,16 +69,16 @@ module Worktrees
       }
     end
 
-    def primary_peacock_color(common_directory:, fallback:)
+    def primary_peacock_color(common_directory:)
       settings_path = File.join(
         File.dirname(common_directory), ".vscode", "settings.json",
       )
-      return fallback unless File.exist?(settings_path)
+      return unless File.exist?(settings_path)
 
       color = JSON.parse(File.read(settings_path))["peacock.color"]
-      color.is_a?(String) && !color.empty? ? color : fallback
+      color if color.is_a?(String) && !color.empty?
     rescue JSON::ParserError
-      fallback
+      nil
     end
 
     def read_worktree_settings(settings_path)

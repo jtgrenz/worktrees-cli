@@ -5,11 +5,11 @@ require_relative "test_helper"
 class WorktreeTest < WorktreesTestCase
   def test_parses_branch_detached_and_prunable_worktrees
     records = Worktrees.parse_porcelain(<<~PORCELAIN)
-      worktree /tmp/zenpayroll
+      worktree /tmp/example_app
       HEAD abc123
       branch refs/heads/main
 
-      worktree /tmp/zenpayroll scratch
+      worktree /tmp/example_app scratch
       HEAD def456
       detached
       prunable gitdir file points to non-existent location
@@ -18,14 +18,14 @@ class WorktreeTest < WorktreesTestCase
     assert_equal(
       [
         {
-          path: "/tmp/zenpayroll",
+          path: "/tmp/example_app",
           head: "abc123",
           branch: "main",
           detached: false,
           prunable: false,
         },
         {
-          path: "/tmp/zenpayroll scratch",
+          path: "/tmp/example_app scratch",
           head: "def456",
           branch: nil,
           detached: true,

@@ -31,7 +31,8 @@ module Worktrees
       @now = now
       @interactive = interactive.nil? ? input.tty? && output.tty? : interactive
       @read_key = read_key || TerminalKeyReader.new(input).method(:read)
-      @colorizer = Colorizer.new(enabled: @interactive && !environment.key?("NO_COLOR"))
+      @environment = environment
+      @colorizer = Colorizer.new(enabled: @interactive && !@environment.key?("NO_COLOR"))
     end
 
     def run
@@ -40,6 +41,9 @@ module Worktrees
 
       run_browser
     rescue CommandFailed
+      1
+    rescue EditorError => error
+      @error.puts "worktrees: #{error.message}"
       1
     rescue Interrupt
       @output.puts
@@ -392,6 +396,7 @@ module Worktrees
       @workflow ||= WorktreeWorkflow.new(
         command_executor: @command_executor,
         vscode_identity:,
+        gui_editor: @environment["GUI_EDITOR"],
       )
     end
 

@@ -77,12 +77,12 @@ class CliTest < WorktreesTestCase
   end
 
   def test_prune_list_includes_every_non_primary_worktree_with_status
-    primary = "/tmp/zenpayroll"
-    secondary_main = "/tmp/zenpayroll main"
-    merged = "/tmp/zenpayroll merged"
-    dirty = "/tmp/zenpayroll dirty"
-    active = "/tmp/zenpayroll active"
-    stale = "/tmp/zenpayroll stale"
+    primary = "/tmp/example_app"
+    secondary_main = "/tmp/example_app main"
+    merged = "/tmp/example_app merged"
+    dirty = "/tmp/example_app dirty"
+    active = "/tmp/example_app active"
+    stale = "/tmp/example_app stale"
     command_executor = FakeCommandExecutor.new(
       repository: primary,
       porcelain: <<~PORCELAIN,
@@ -140,8 +140,8 @@ class CliTest < WorktreesTestCase
   end
 
   def test_regular_list_warns_when_a_secondary_worktree_owns_main
-    primary = "/tmp/payroll_building_blocks"
-    secondary_main = "/tmp/payroll_building_blocks-name-apostrophes"
+    primary = "/tmp/example_library"
+    secondary_main = "/tmp/example_library-feature"
     command_executor = FakeCommandExecutor.new(
       repository: primary,
       porcelain: <<~PORCELAIN,
@@ -172,9 +172,9 @@ class CliTest < WorktreesTestCase
   end
 
   def test_prune_list_includes_a_clean_github_squash_merge
-    primary = "/tmp/zenpayroll"
-    soap_work = "/tmp/zenpayroll-pr-366505"
-    branch = "dev/nys-45/soap-work"
+    primary = "/tmp/example_app"
+    merged_work = "/tmp/example_app-merged-change"
+    branch = "dev/squash-merged-work"
     command_executor = FakeCommandExecutor.new(
       repository: primary,
       porcelain: <<~PORCELAIN,
@@ -182,7 +182,7 @@ class CliTest < WorktreesTestCase
         HEAD abc123
         branch refs/heads/main
 
-        worktree #{soap_work}
+        worktree #{merged_work}
         HEAD def456
         branch refs/heads/#{branch}
       PORCELAIN
@@ -209,8 +209,8 @@ class CliTest < WorktreesTestCase
   end
 
   def test_abbreviates_home_in_menu_without_changing_selected_worktree_path
-    primary = File.join(Dir.home, "src/zenpayroll")
-    selected = File.join(Dir.home, "src/zenpayroll feature")
+    primary = File.join(Dir.home, "src/example_app")
+    selected = File.join(Dir.home, "src/example_app feature")
     command_executor = FakeCommandExecutor.new(
       repository: primary,
       porcelain: porcelain(primary:, selected:),
@@ -223,15 +223,16 @@ class CliTest < WorktreesTestCase
       error: StringIO.new,
       command_executor:,
       vscode_identity: FakeVsCodeIdentity.new,
+      environment: { "GUI_EDITOR" => "code --reuse-window" },
     )
 
     assert_equal 0, app.run
-    assert_includes output.string, "~/src/zenpayroll"
+    assert_includes output.string, "~/src/example_app"
     refute_includes output.string, Dir.home
     assert_equal(
       [
         {
-          command: ["zsh", "-ic", 'edit "$1"', "worktrees", selected],
+          command: ["code", "--reuse-window", selected],
           chdir: primary,
         },
       ],
@@ -240,8 +241,8 @@ class CliTest < WorktreesTestCase
   end
 
   def test_arrow_keys_select_a_worktree_in_an_interactive_terminal
-    primary = "/tmp/zenpayroll"
-    selected = "/tmp/zenpayroll feature"
+    primary = "/tmp/example_app"
+    selected = "/tmp/example_app feature"
     command_executor = FakeCommandExecutor.new(
       repository: primary,
       porcelain: porcelain(primary:, selected:),
@@ -257,12 +258,59 @@ class CliTest < WorktreesTestCase
       vscode_identity: FakeVsCodeIdentity.new,
       interactive: true,
       read_key: -> { keys.shift },
+      environment: { "GUI_EDITOR" => "code" },
     )
 
     assert_equal 0, app.run
     assert_equal selected, command_executor.runs.first.fetch(:command).last
   rescue ArgumentError => error
     flunk "interactive selection is unavailable: #{error.message}"
+  end
+
+  def test_errors_when_gui_editor_is_not_set
+    primary = "/tmp/example_app"
+    selected = "/tmp/example_app feature"
+    command_executor = FakeCommandExecutor.new(
+      repository: primary,
+      porcelain: porcelain(primary:, selected:),
+    )
+    error = StringIO.new
+    app = Worktrees::WorktreesCli.new(
+      directory: primary,
+      input: StringIO.new("2\n"),
+      output: StringIO.new,
+      error:,
+      command_executor:,
+      vscode_identity: FakeVsCodeIdentity.new,
+      environment: {},
+    )
+
+    assert_equal 1, app.run
+    assert_equal "worktrees: GUI_EDITOR is not set\n", error.string
+    assert_empty command_executor.runs
+  end
+
+  def test_errors_when_gui_editor_has_unmatched_quotes
+    primary = "/tmp/example_app"
+    selected = "/tmp/example_app feature"
+    command_executor = FakeCommandExecutor.new(
+      repository: primary,
+      porcelain: porcelain(primary:, selected:),
+    )
+    error = StringIO.new
+    app = Worktrees::WorktreesCli.new(
+      directory: primary,
+      input: StringIO.new("2\n"),
+      output: StringIO.new,
+      error:,
+      command_executor:,
+      vscode_identity: FakeVsCodeIdentity.new,
+      environment: { "GUI_EDITOR" => 'code "unterminated' },
+    )
+
+    assert_equal 1, app.run
+    assert_match(/\Aworktrees: GUI_EDITOR is invalid:/, error.string)
+    assert_empty command_executor.runs
   end
 
   def test_interactive_menu_redraws_wrapped_rows_without_appending
@@ -289,8 +337,8 @@ class CliTest < WorktreesTestCase
   end
 
   def test_prune_selection_removes_a_stale_registration_and_refreshes
-    primary = "/tmp/zenpayroll"
-    stale = "/tmp/zenpayroll stale"
+    primary = "/tmp/example_app"
+    stale = "/tmp/example_app stale"
     command_executor = FakeCommandExecutor.new(
       repository: primary,
       porcelain: [
@@ -326,8 +374,8 @@ class CliTest < WorktreesTestCase
   end
 
   def test_pruning_the_current_worktree_refreshes_from_the_primary_checkout
-    primary = "/tmp/zenpayroll"
-    current = "/tmp/zenpayroll feature"
+    primary = "/tmp/example_app"
+    current = "/tmp/example_app feature"
     registered = porcelain(primary:, selected: current)
     command_executor = FakeCommandExecutor.new(
       repository: current,
@@ -358,12 +406,12 @@ class CliTest < WorktreesTestCase
   end
 
   def test_interactive_prune_menu_colours_stale_status_red
-    primary = "/tmp/zenpayroll"
+    primary = "/tmp/example_app"
     command_executor = FakeCommandExecutor.new(
       repository: primary,
       porcelain: porcelain(
         primary:,
-        selected: "/tmp/zenpayroll stale",
+        selected: "/tmp/example_app stale",
         selected_prunable: true,
       ),
     )
@@ -387,8 +435,8 @@ class CliTest < WorktreesTestCase
   end
 
   def test_confirming_a_dirty_worktree_force_removes_it
-    primary = "/tmp/zenpayroll"
-    dirty = "/tmp/zenpayroll dirty"
+    primary = "/tmp/example_app"
+    dirty = "/tmp/example_app dirty"
     registered = porcelain(primary:, selected: dirty)
     command_executor = FakeCommandExecutor.new(
       repository: primary,
@@ -421,8 +469,8 @@ class CliTest < WorktreesTestCase
   end
 
   def test_confirming_clean_secondary_main_removes_it_without_force
-    primary = "/tmp/payroll_building_blocks"
-    secondary_main = "/tmp/payroll_building_blocks-name-apostrophes"
+    primary = "/tmp/example_library"
+    secondary_main = "/tmp/example_library-feature"
     registered = <<~PORCELAIN
       worktree #{primary}
       HEAD abc123
@@ -465,8 +513,8 @@ class CliTest < WorktreesTestCase
   end
 
   def test_prune_rechecks_status_before_confirming_removal
-    primary = "/tmp/zenpayroll"
-    selected = "/tmp/zenpayroll changed"
+    primary = "/tmp/example_app"
+    selected = "/tmp/example_app changed"
     merged = porcelain(primary:, selected:).sub("HEAD def456", "HEAD merged123")
     no_longer_merged = merged.sub("HEAD merged123", "HEAD active456")
     command_executor = FakeCommandExecutor.new(
