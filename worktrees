@@ -1,0 +1,11 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+project_root = File.dirname(File.realpath(__FILE__))
+require File.join(project_root, "lib/worktrees")
+
+if $PROGRAM_NAME == __FILE__
+  exit Worktrees::WorktreesCli.new(
+    arguments: ARGV,
+  ).run
+end
